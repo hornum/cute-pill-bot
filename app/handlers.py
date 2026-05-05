@@ -6,6 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.bot.states import AddMedicine
+from app.service.user_service import get_user
 
 
 router = Router()
@@ -13,8 +14,8 @@ router = Router()
 
 @router.message(CommandStart())
 async def start(message: Message):
-    #TODO добавить создание пользователя в бд, когда бд будет настроена
-    await message.reply(f"Привет, {message.from_user.first_name}!")
+    user = await get_user(message.chat.id, message.from_user.id, message.from_user.username)
+    await message.reply(f"Привет, {user.username}!")
 
 @router.message(Command('help'))
 async def help(message: Message):
