@@ -6,7 +6,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.bot.states import AddMedicine
-from app.service.user_service import get_user
+from app.service.pill_service import create_medicine_and_reminder
+from app.service.user_service import get_or_create_user
 
 
 router = Router()
@@ -14,7 +15,7 @@ router = Router()
 
 @router.message(CommandStart())
 async def start(message: Message):
-    user = await get_user(message.chat.id, message.from_user.id, message.from_user.username)
+    user = await get_or_create_user(message.chat.id, message.from_user.id, message.from_user.username)
     await message.reply(f"Привет, {user.username}!")
 
 @router.message(Command('help'))
@@ -51,22 +52,23 @@ async def process_medicine_dosage(message: Message, state: FSMContext):
 @router.message(AddMedicine.waiting_for_time)
 async def process_medicine_time(message: Message, state: FSMContext):
     time_text = message.text.strip()
+    data = await state.get_data()
+
     try:
-        reminder_time = datetime.strptime(time_text, "%H:%M").time()
-    except ValueError:
-        await message.answer("Неверный формат времени. Введите время в формате ЧЧ:ММ. Например: 09:00")
+        medicine = await create_medicine_and_reminder(
+            tg_id = message.from_user.id,
+            pill_name = data['name'],
+            dose = data['dosage'],
+            str_time = time_text
+        )
+    except ValueError as error:
+        await message.answer(str(error))
         return
 
-    data = await state.get_data()
-    name = data["name"]
-    dosage = data["dosage"]
-
-    #TODO Добавить сохранение в БД после настройки бд
-
     await message.answer(
-        f"Готово!\n\n"
-        f"Таблетка: {name}\n"
-        f"Дозировка: {dosage}\n"
-        f"Время: {reminder_time.strftime('%H:%M')}"
+        f"Готово! Добавлена:\n\n"
+        f"Таблетка: {medicine.name}\n"
+        f"Дозировка: {medicine.dosage}\n"
+        f"Время напоминания: Ежедневно, {time_text}"
     )
     await state.clear()
