@@ -1,5 +1,6 @@
 from datetime import time, datetime
 
+
 def parse_reminder_time(time_to_remind: str) -> time:
     try:
         return datetime.strptime(time_to_remind, "%H:%M").time()

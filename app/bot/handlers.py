@@ -19,13 +19,11 @@ router = Router()
 @router.message(CommandStart())
 async def start(message: Message):
     user = await get_or_create_user(message.chat.id, message.from_user.id, message.from_user.username)
-    await message.reply(f"Привет, {user.username}!")
+    await message.reply(f"Привет, {user.username}!\n\nЧто этот бот может:\n\n{HELP_TEXT}")
 
 @router.message(Command('help'))
-async def help(message: Message):
-    await message.reply('/help - Показать команды\n'
-                        '/start - Приветствие с именем\n'
-                        '/add - Добавить таблетку')
+async def bot_help(message: Message):
+    await message.reply(HELP_TEXT)
 
 @router.message(Command('list'))
 async def list_medicines(message: Message):
@@ -38,7 +36,7 @@ async def list_medicines(message: Message):
     lines = []
 
     for medicine in medicines_list:
-        lines.append(f"{medicine.name} - {medicine.dosage}")
+        lines.append(f"{medicine.name} - {medicine.dosage}, ID: {medicine.id}")
 
     answer_text = "\n".join(lines)
 
