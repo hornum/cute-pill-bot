@@ -48,3 +48,16 @@ async def get_user_medicines(tg_id: int) -> list[Medicine]:
         medicines = result.scalars().all()
 
         return list(medicines)
+
+async def get_medicine_by_id(med_id: int) -> Medicine:
+    async with async_session_maker() as session:
+        query = select(Medicine).where(Medicine.id == med_id)
+        result = await session.execute(query)
+        medicine = result.scalar_one_or_none()
+        return medicine
+
+async def delete_medicine(medicine_id: int) -> None:
+    async with async_session_maker() as session:
+        medicine = await get_medicine_by_id(medicine_id)
+        await session.delete(medicine)
+        await session.commit()

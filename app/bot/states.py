@@ -5,3 +5,7 @@ class AddMedicine(StatesGroup):
     waiting_for_name = State()
     waiting_for_dosage = State()
     waiting_for_time = State()
+
+class DeleteMedicine(StatesGroup):
+    waiting_for_id = State()
+    waiting_for_confirmation = State()

@@ -1,11 +1,11 @@
 import asyncio
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.config import settings as config
 from app.config import CHECK_REMINDERS_INTERVAL_SECS as CHECK_INTERVAL
-from app.handlers import router
+from app.bot.handlers import router
 from app.scheduler.jobs import check_reminders
 
 BOT_TOKEN = config.bot_token
