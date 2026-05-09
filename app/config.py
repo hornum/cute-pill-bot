@@ -5,6 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = BASE_DIR / ".env"
+CHECK_REMINDERS_INTERVAL_SECS = 60
 
 class Settings(BaseSettings):
     DB_USER: str
