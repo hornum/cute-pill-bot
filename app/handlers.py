@@ -6,7 +6,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from app.bot.states import AddMedicine
-from app.service.pill_service import create_medicine_and_reminder
+from app.service.pill_service import create_medicine_and_reminder, get_user_medicines
 from app.service.user_service import get_or_create_user
 
 
@@ -23,6 +23,23 @@ async def help(message: Message):
     await message.reply('/help - Показать команды\n'
                         '/start - Приветствие с именем\n'
                         '/add - Добавить таблетку')
+
+@router.message(Command('list'))
+async def list_medicines(message: Message):
+    medicines_list = await get_user_medicines(message.from_user.id)
+
+    if not medicines_list:
+        await message.answer("Вы пока не добавили таблетки")
+        return
+
+    lines = []
+
+    for medicine in medicines_list:
+        lines.append(f"{medicine.name} - {medicine.dosage}")
+
+    answer_text = "\n".join(lines)
+
+    await message.answer(f"Ваши таблетки:\n{answer_text}")
 
 @router.message(Command('add'))
 async def add_medicine_start(message: Message, state: FSMContext):

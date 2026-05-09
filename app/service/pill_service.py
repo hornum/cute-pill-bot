@@ -1,3 +1,5 @@
+from sqlalchemy import select
+
 from app.db.models import Medicine, Reminder
 from app.db.session import async_session_maker
 from app.service.reminder_service import parse_reminder_time
@@ -35,3 +37,14 @@ async def create_medicine_and_reminder(
         await session.refresh(medicine)
 
         return medicine
+
+async def get_user_medicines(tg_id: int) -> list[Medicine]:
+    user = await get_user_or_raise(tg_id=tg_id)
+
+    async with async_session_maker() as session:
+        query = select(Medicine).where(Medicine.user_id == user.id)
+        result = await session.execute(query)
+
+        medicines = result.scalars().all()
+
+        return list(medicines)
