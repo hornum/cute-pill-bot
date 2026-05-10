@@ -1,9 +1,9 @@
 from datetime import datetime
 
-from aiogram import Router
-from aiogram.filters import Command, CommandStart
+from aiogram import Router, F
+from aiogram.filters import Command, CommandStart, or_f
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 
 from app.bot.states import AddMedicine, DeleteMedicine
 from app.service.pill_service import create_medicine_and_reminder, get_user_medicines, get_medicine_by_id, \
@@ -19,13 +19,16 @@ router = Router()
 @router.message(CommandStart())
 async def start(message: Message):
     user = await get_or_create_user(message.chat.id, message.from_user.id, message.from_user.username)
-    await message.reply(f"Привет, {user.username}!\n\nЧто этот бот может:\n\n{HELP_TEXT}")
+    await message.reply(
+        f"Привет, {user.username}!\n\nЧто этот бот может:\n\n{HELP_TEXT}",
+        reply_markup=kb.main_menu
+    )
 
 @router.message(Command('help'))
 async def bot_help(message: Message):
     await message.reply(HELP_TEXT)
 
-@router.message(Command('list'))
+@router.message(or_f(Command("list"), F.text == 'Список таблеток'))
 async def list_medicines(message: Message):
     medicines_list = await get_user_medicines(message.from_user.id)
 
@@ -43,10 +46,12 @@ async def list_medicines(message: Message):
     await message.answer(f"Ваши таблетки:\n{answer_text}")
 
 
-@router.message(Command('delete'))
+@router.message(or_f(Command('delete'), F.text == '🗑 Удалить таблетку'))
 async def delete_medicine_start(message: Message, state: FSMContext):
     await message.reply('Введите ID таблетки, которую хотите удалить.'
-                        'Посмотреть ID можно в списке таблеток  командой /list')
+                        'Посмотреть ID можно в списке таблеток  командой /list',
+                        reply_markup=ReplyKeyboardRemove()
+                        )
     await state.set_state(DeleteMedicine.waiting_for_id)
 
 
@@ -71,7 +76,8 @@ async def delete_medicine_confirmation(message: Message, state: FSMContext):
 
     await message.answer(f"Вы действительно хотите удалить таблетку?\n{medicine.name}, {medicine.dosage}?"
                          f"\n\nВыберите на клавиатуре или отправьте смайлик ✅/❌",
-                         reply_markup=kb.delete_confirmation)
+                         reply_markup=kb.delete_confirmation
+                         )
 
     await state.set_state(DeleteMedicine.waiting_for_confirmation)
 
@@ -82,15 +88,15 @@ async def delete_medicine_confirmation(message: Message, state: FSMContext):
     if answer == "✅":
         data = await state.get_data()
         await delete_medicine(data["medicine_id"])
-        await message.answer("Таблетка удалена!")
+        await message.answer("Таблетка удалена!", reply_markup=kb.main_menu)
 
     elif answer == "❌":
         await state.clear()
-        await message.answer("Окей! Удаление отменено.")
+        await message.answer("Окей! Удаление отменено.", reply_markup=kb.main_menu)
 
-@router.message(Command('add'))
+@router.message(or_f(Command('add'), F.text == '➕ Добавить таблетку'))
 async def add_medicine_start(message: Message, state: FSMContext):
-    await message.reply('Введите название таблетки:')
+    await message.reply('Введите название таблетки:', reply_markup=ReplyKeyboardRemove())
     await state.set_state(AddMedicine.waiting_for_name)
 
 @router.message(AddMedicine.waiting_for_name)
@@ -133,6 +139,7 @@ async def process_medicine_time(message: Message, state: FSMContext):
         f"Готово! Добавлена:\n\n"
         f"Таблетка: {medicine.name}\n"
         f"Дозировка: {medicine.dosage}\n"
-        f"Время напоминания: Ежедневно, {time_text}"
+        f"Время напоминания: Ежедневно, {time_text}",
+        reply_markup=kb.main_menu
     )
     await state.clear()
