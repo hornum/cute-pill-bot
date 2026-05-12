@@ -1,17 +1,19 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, time
 
 from aiogram import Bot
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
+from app.bot.keyboards import pill_confirmation
 from app.db.models import Reminder, Medicine
 from app.db.session import async_session_maker
 
 
-def get_time_without_secs():
+def get_time_without_secs() -> time:
     now = datetime.now()
     now = now.time().replace(second=0, microsecond=0)
     return now
+
 
 def was_send_today(last_sent_at: datetime | None) -> bool:
     if last_sent_at is None:
@@ -21,7 +23,32 @@ def was_send_today(last_sent_at: datetime | None) -> bool:
     return now.date() == last_sent_at.date()
 
 
-async def check_reminders(bot: Bot):
+async def send_reminder(bot: Bot, chat_id: int, reminder: Reminder) -> None:
+    await bot.send_message(
+        chat_id=chat_id,
+        text=(
+            "Напоминание\n"
+            f"Пора принять {reminder.medicine.name}\n"
+            f"В количестве: {reminder.medicine.dosage}\n"
+        ),
+        reply_markup=pill_confirmation(reminder.id)
+    )
+
+
+async def resend_reminder(bot: Bot, chat_id: int, reminder_id: int):
+    async with async_session_maker() as session:
+        query = (
+            select(Reminder)
+            .options(joinedload(Reminder.medicine))
+            .where(Reminder.id == reminder_id)
+        )
+        result = await session.execute(query)
+        reminder = result.scalar_one_or_none()
+
+        await send_reminder(bot, chat_id, reminder)
+
+
+async def check_reminders(bot: Bot) -> None:
     current_time = get_time_without_secs()
 
     async with async_session_maker() as session:
@@ -44,14 +71,7 @@ async def check_reminders(bot: Bot):
             medicine = reminder.medicine
             user = medicine.user
 
-            await bot.send_message(
-                chat_id=user.chat_id,
-                text=(
-                    "Напоминание\n"
-                    f"Пора принять {medicine.name}\n"
-                    f"В количестве: {medicine.dosage}\n"
-                )
-            )
+            await send_reminder(bot, user.chat_id, reminder)
 
             reminder.last_sent_at = datetime.now(timezone.utc)
 
