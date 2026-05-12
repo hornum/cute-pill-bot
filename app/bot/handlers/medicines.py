@@ -1,32 +1,15 @@
-from datetime import datetime
-
 from aiogram import Router, F
-from aiogram.filters import Command, CommandStart, or_f
+from aiogram.filters import Command, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
 
 from app.bot.states import AddMedicine, DeleteMedicine
-from app.service.pill_service import create_medicine_and_reminder, get_user_medicines, get_medicine_by_id, \
+from app.service.pill_service import get_user_medicines, create_medicine_and_reminder, get_medicine_by_id, \
     delete_medicine
-from app.service.user_service import get_or_create_user
 import app.bot.keyboards as kb
-from app.config import HELP_COMMAND_TEXT as HELP_TEXT
-
 
 router = Router()
 
-
-@router.message(CommandStart())
-async def start(message: Message):
-    user = await get_or_create_user(message.chat.id, message.from_user.id, message.from_user.username)
-    await message.reply(
-        f"Привет, {user.username}!\n\nЧто этот бот может:\n\n{HELP_TEXT}",
-        reply_markup=kb.main_menu
-    )
-
-@router.message(Command('help'))
-async def bot_help(message: Message):
-    await message.reply(HELP_TEXT)
 
 @router.message(or_f(Command("list"), F.text == 'Список таблеток'))
 async def list_medicines(message: Message):
@@ -45,54 +28,6 @@ async def list_medicines(message: Message):
 
     await message.answer(f"Ваши таблетки:\n{answer_text}")
 
-
-@router.message(or_f(Command('delete'), F.text == '🗑 Удалить таблетку'))
-async def delete_medicine_start(message: Message, state: FSMContext):
-    await message.reply('Введите ID таблетки, которую хотите удалить.'
-                        'Посмотреть ID можно в списке таблеток  командой /list',
-                        reply_markup=ReplyKeyboardRemove()
-                        )
-    await state.set_state(DeleteMedicine.waiting_for_id)
-
-
-@router.message(DeleteMedicine.waiting_for_id)
-async def delete_medicine_confirmation(message: Message, state: FSMContext):
-
-    medicine_id = message.text.replace('ID', '').replace('id', '').strip()
-
-    try:
-        medicine_id = int(medicine_id)
-    except ValueError:
-        await message.answer("Неверный формат ID! Введите число.")
-        return
-
-    medicine = await get_medicine_by_id(medicine_id)
-
-    if not medicine:
-        await message.answer("Таблетка с этим ID не найдена, введите корректный ID.")
-        return
-
-    await state.update_data(medicine_id=medicine_id)
-
-    await message.answer(f"Вы действительно хотите удалить таблетку?\n{medicine.name}, {medicine.dosage}?"
-                         f"\n\nВыберите на клавиатуре или отправьте смайлик ✅/❌",
-                         reply_markup=kb.delete_confirmation
-                         )
-
-    await state.set_state(DeleteMedicine.waiting_for_confirmation)
-
-@router.message(DeleteMedicine.waiting_for_confirmation)
-async def delete_medicine_confirmation(message: Message, state: FSMContext):
-    answer = message.text
-
-    if answer == "✅":
-        data = await state.get_data()
-        await delete_medicine(data["medicine_id"])
-        await message.answer("Таблетка удалена!", reply_markup=kb.main_menu)
-
-    elif answer == "❌":
-        await state.clear()
-        await message.answer("Окей! Удаление отменено.", reply_markup=kb.main_menu)
 
 @router.message(or_f(Command('add'), F.text == '➕ Добавить таблетку'))
 async def add_medicine_start(message: Message, state: FSMContext):
@@ -143,3 +78,52 @@ async def process_medicine_time(message: Message, state: FSMContext):
         reply_markup=kb.main_menu
     )
     await state.clear()
+
+
+@router.message(or_f(Command('delete'), F.text == '🗑 Удалить таблетку'))
+async def delete_medicine_start(message: Message, state: FSMContext):
+    await message.reply('Введите ID таблетки, которую хотите удалить.'
+                        'Посмотреть ID можно в списке таблеток  командой /list',
+                        reply_markup=ReplyKeyboardRemove()
+                        )
+    await state.set_state(DeleteMedicine.waiting_for_id)
+
+
+@router.message(DeleteMedicine.waiting_for_id)
+async def delete_medicine_confirmation(message: Message, state: FSMContext):
+
+    medicine_id = message.text.replace('ID', '').replace('id', '').strip()
+
+    try:
+        medicine_id = int(medicine_id)
+    except ValueError:
+        await message.answer("Неверный формат ID! Введите число.")
+        return
+
+    medicine = await get_medicine_by_id(medicine_id)
+
+    if not medicine:
+        await message.answer("Таблетка с этим ID не найдена, введите корректный ID.")
+        return
+
+    await state.update_data(medicine_id=medicine_id)
+
+    await message.answer(f"Вы действительно хотите удалить таблетку?\n{medicine.name}, {medicine.dosage}?"
+                         f"\n\nВыберите на клавиатуре или отправьте смайлик ✅/❌",
+                         reply_markup=kb.delete_confirmation
+                         )
+
+    await state.set_state(DeleteMedicine.waiting_for_confirmation)
+
+@router.message(DeleteMedicine.waiting_for_confirmation)
+async def delete_medicine_confirmation(message: Message, state: FSMContext):
+    answer = message.text
+
+    if answer == "✅":
+        data = await state.get_data()
+        await delete_medicine(data["medicine_id"])
+        await message.answer("Таблетка удалена!", reply_markup=kb.main_menu)
+
+    elif answer == "❌":
+        await state.clear()
+        await message.answer("Окей! Удаление отменено.", reply_markup=kb.main_menu)
