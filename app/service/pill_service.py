@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.orm import joinedload
 
 from app.db.models import Medicine, Reminder
 from app.db.session import async_session_maker
@@ -38,16 +39,31 @@ async def create_medicine_and_reminder(
 
         return medicine
 
-async def get_user_medicines(tg_id: int) -> list[Medicine]:
+async def get_medicines_and_reminders_list(tg_id: int) -> list:
     user = await get_user_or_raise(tg_id=tg_id)
 
     async with async_session_maker() as session:
-        query = select(Medicine).where(Medicine.user_id == user.id)
+        query = (
+            select(Medicine)
+            .options(joinedload(Medicine.reminders))
+            .where(Medicine.user_id == user.id)
+        )
         result = await session.execute(query)
 
-        medicines = result.scalars().all()
+        medicines_with_reminders = result.scalars().unique().all()
+        med_and_rem_final = []
 
-        return list(medicines)
+        for medicine in medicines_with_reminders:
+            med_and_rem_final.append(
+                {
+                    "id": medicine.id,
+                    "name": medicine.name,
+                    "dosage": medicine.dosage,
+                    "reminder_time": medicine.reminders[0].reminder_time.strftime("%H:%M"),
+                }
+            )
+
+        return med_and_rem_final
 
 async def get_medicine_by_id(med_id: int) -> Medicine:
     async with async_session_maker() as session:

@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove
 
 from app.bot.states import AddMedicine, DeleteMedicine
-from app.service.pill_service import get_user_medicines, create_medicine_and_reminder, get_medicine_by_id, \
+from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminder, get_medicine_by_id, \
     delete_medicine
 import app.bot.keyboards as kb
 
@@ -13,7 +13,7 @@ router = Router()
 
 @router.message(or_f(Command("list"), F.text == 'Список таблеток'))
 async def list_medicines(message: Message):
-    medicines_list = await get_user_medicines(message.from_user.id)
+    medicines_list = await get_medicines_and_reminders_list(message.from_user.id)
 
     if not medicines_list:
         await message.answer("Вы пока не добавили таблетки")
@@ -22,11 +22,12 @@ async def list_medicines(message: Message):
     lines = []
 
     for medicine in medicines_list:
-        lines.append(f"{medicine.name} - {medicine.dosage}, ID: {medicine.id}")
+        lines.append(f"ID: {medicine["id"]}, {medicine["name"]} - {medicine["dosage"]}\n"
+                     f"Время приёма: {medicine["reminder_time"]};")
 
-    answer_text = "\n".join(lines)
+    answer_text = "\n------\n".join(lines)
 
-    await message.answer(f"Ваши таблетки:\n{answer_text}")
+    await message.answer(f"Ваши таблетки:\n\n{answer_text}")
 
 
 @router.message(or_f(Command('add'), F.text == '➕ Добавить таблетку'))
