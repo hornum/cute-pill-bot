@@ -5,7 +5,7 @@ from aiogram.types import Message, ReplyKeyboardRemove
 
 from app.bot.states import AddMedicine, DeleteMedicine
 from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminder, get_medicine_by_id, \
-    delete_medicine
+    delete_medicine, is_less_than_10_reminders, get_reminder_with_time
 import app.bot.keyboards as kb
 
 router = Router()
@@ -32,8 +32,11 @@ async def list_medicines(message: Message):
 
 @router.message(or_f(Command('add'), F.text == '➕ Добавить таблетку'))
 async def add_medicine_start(message: Message, state: FSMContext):
-    await message.reply('Введите название таблетки:', reply_markup=ReplyKeyboardRemove())
-    await state.set_state(AddMedicine.waiting_for_name)
+    if await is_less_than_10_reminders(message.from_user.id):
+        await message.reply('Введите название таблетки:', reply_markup=ReplyKeyboardRemove())
+        await state.set_state(AddMedicine.waiting_for_name)
+    else:
+        await message.reply("Вы достигли максимума таблеток! (10 штук)\nСперва удалите другую таблетку.")
 
 @router.message(AddMedicine.waiting_for_name)
 async def process_medicine_name(message: Message, state: FSMContext):

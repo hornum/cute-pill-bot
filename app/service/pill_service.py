@@ -77,3 +77,16 @@ async def delete_medicine(medicine_id: int) -> None:
         medicine = await get_medicine_by_id(medicine_id)
         await session.delete(medicine)
         await session.commit()
+
+async def is_less_than_10_reminders(tg_id: int) -> bool:
+    user = await get_user_or_raise(tg_id=tg_id)
+
+    async with async_session_maker() as session:
+        query = select(Medicine).where(Medicine.user_id == user.id)
+        result = await session.execute(query)
+        medicines = result.scalars().all()
+
+    if len(medicines) <= 10:
+        return True
+
+    return False
