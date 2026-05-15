@@ -24,6 +24,10 @@ def was_send_today(last_sent_at: datetime | None) -> bool:
 
 
 async def send_reminder(bot: Bot, chat_id: int, reminder: Reminder) -> None:
+
+    if reminder is None:
+        return
+
     await bot.send_message(
         chat_id=chat_id,
         text=(

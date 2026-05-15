@@ -1,33 +1,50 @@
 from aiogram import Router, F
 from aiogram.filters import Command, or_f
 from aiogram.fsm.context import FSMContext
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
 from app.bot.states import AddMedicine, DeleteMedicine
 from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminder, get_medicine_by_id, \
     delete_medicine, is_less_than_10_reminders, get_reminder_with_time
 import app.bot.keyboards as kb
+from app.service.reminder_service import get_time_without_sec
 
 router = Router()
 
 
 @router.message(or_f(Command("list"), F.text == 'Список таблеток'))
 async def list_medicines(message: Message):
-    medicines_list = await get_medicines_and_reminders_list(message.from_user.id)
-
-    if not medicines_list:
-        await message.answer("Вы пока не добавили таблетки")
+    try:
+        medicines_list = await get_medicines_and_reminders_list(message.from_user.id)
+    except ValueError as error:
+        await message.answer(str(error))
         return
 
-    lines = []
+    await message.answer(f"💊 Ваши таблетки\nВыберите для управления",
+                        reply_markup=kb.medicines_list_kb(medicines_list))
 
-    for medicine in medicines_list:
-        lines.append(f"ID: {medicine["id"]}, {medicine["name"]} - {medicine["dosage"]}\n"
-                     f"Время приёма: {medicine["reminder_time"]};")
+@router.callback_query(F.data == "back_to_list")
+async def on_back_to_list(callback: CallbackQuery):
+    try:
+        medicines_list = await get_medicines_and_reminders_list(callback.from_user.id)
+    except ValueError as error:
+        await callback.message.edit_text(str(error))
+        return
 
-    answer_text = "\n------\n".join(lines)
+    await callback.message.edit_text(f"💊 Ваши таблетки\nВыберите для управления",
+                        reply_markup=kb.medicines_list_kb(medicines_list))
 
-    await message.answer(f"Ваши таблетки:\n\n{answer_text}")
+
+@router.callback_query(F.data.startswith("med:"))
+async def on_med_selection(callback: CallbackQuery):
+    med_id = int(callback.data.split(":")[1])
+    med_with_time = await get_reminder_with_time(med_id)
+    await callback.message.edit_text(text=f"Что хотите сделать?\n\n"
+                                          f"Название: {med_with_time["name"]}\n"
+                                          f"Дозировка: {med_with_time['dosage']}\n"
+                                          f"Время приёма: {med_with_time['time']}",
+                                     reply_markup=kb.medicines_actions_kb(med_id))
+    await callback.answer()
 
 
 @router.message(or_f(Command('add'), F.text == '➕ Добавить таблетку'))
@@ -64,7 +81,7 @@ async def process_medicine_time(message: Message, state: FSMContext):
     data = await state.get_data()
 
     try:
-        medicine = await create_medicine_and_reminder(
+        medicine, reminder = await create_medicine_and_reminder(
             tg_id = message.from_user.id,
             pill_name = data['name'],
             dose = data['dosage'],
@@ -78,56 +95,22 @@ async def process_medicine_time(message: Message, state: FSMContext):
         f"Готово! Добавлена:\n\n"
         f"Таблетка: {medicine.name}\n"
         f"Дозировка: {medicine.dosage}\n"
-        f"Время напоминания: Ежедневно, {time_text}",
+        f"Время напоминания: Ежедневно, {get_time_without_sec(reminder.reminder_time)}",
         reply_markup=kb.main_menu
     )
     await state.clear()
 
 
-@router.message(or_f(Command('delete'), F.text == '🗑 Удалить таблетку'))
-async def delete_medicine_start(message: Message, state: FSMContext):
-    await message.reply('Введите ID таблетки, которую хотите удалить.'
-                        'Посмотреть ID можно в списке таблеток  командой /list',
-                        reply_markup=ReplyKeyboardRemove()
-                        )
-    await state.set_state(DeleteMedicine.waiting_for_id)
+@router.callback_query(F.data.startswith("delete:"))
+async def on_delete_medicine(callback: CallbackQuery):
+    med_id = int(callback.data.split(":")[1])
+    medicine = await get_medicine_by_id(med_id)
+    await callback.message.edit_text(f"Вы действительно хотите удалить {medicine.name} - {medicine.dosage}?",
+                                     reply_markup=kb.delete_confirmation_kb(med_id))
 
+@router.callback_query(F.data.startswith("conf_delete:"))
+async def on_conf_delete_medicine(callback: CallbackQuery):
+    med_id = int(callback.data.split(":")[1])
+    await delete_medicine(med_id)
+    await callback.message.edit_text("Таблетка удалена 👌")
 
-@router.message(DeleteMedicine.waiting_for_id)
-async def delete_medicine_confirmation(message: Message, state: FSMContext):
-
-    medicine_id = message.text.replace('ID', '').replace('id', '').strip()
-
-    try:
-        medicine_id = int(medicine_id)
-    except ValueError:
-        await message.answer("Неверный формат ID! Введите число.")
-        return
-
-    medicine = await get_medicine_by_id(medicine_id)
-
-    if not medicine:
-        await message.answer("Таблетка с этим ID не найдена, введите корректный ID.")
-        return
-
-    await state.update_data(medicine_id=medicine_id)
-
-    await message.answer(f"Вы действительно хотите удалить таблетку?\n{medicine.name}, {medicine.dosage}?"
-                         f"\n\nВыберите на клавиатуре или отправьте смайлик ✅/❌",
-                         reply_markup=kb.delete_confirmation
-                         )
-
-    await state.set_state(DeleteMedicine.waiting_for_confirmation)
-
-@router.message(DeleteMedicine.waiting_for_confirmation)
-async def delete_medicine_confirmation(message: Message, state: FSMContext):
-    answer = message.text
-
-    if answer == "✅":
-        data = await state.get_data()
-        await delete_medicine(data["medicine_id"])
-        await message.answer("Таблетка удалена!", reply_markup=kb.main_menu)
-
-    elif answer == "❌":
-        await state.clear()
-        await message.answer("Окей! Удаление отменено.", reply_markup=kb.main_menu)

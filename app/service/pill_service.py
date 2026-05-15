@@ -3,7 +3,7 @@ from sqlalchemy.orm import joinedload
 
 from app.db.models import Medicine, Reminder
 from app.db.session import async_session_maker
-from app.service.reminder_service import parse_reminder_time
+from app.service.reminder_service import parse_reminder_time, get_time_without_sec
 from app.service.user_service import get_user_or_raise
 
 
@@ -12,7 +12,7 @@ async def create_medicine_and_reminder(
         pill_name: str,
         dose: str,
         str_time: str
-) -> Medicine:
+) -> tuple[Medicine, Reminder]:
 
     parsed_time = parse_reminder_time(str_time)
 
@@ -37,7 +37,7 @@ async def create_medicine_and_reminder(
         await session.commit()
         await session.refresh(medicine)
 
-        return medicine
+        return medicine, reminder
 
 async def get_medicines_and_reminders_list(tg_id: int) -> list:
     user = await get_user_or_raise(tg_id=tg_id)
@@ -54,14 +54,18 @@ async def get_medicines_and_reminders_list(tg_id: int) -> list:
         med_and_rem_final = []
 
         for medicine in medicines_with_reminders:
+            output_time = get_time_without_sec(medicine.reminders[0].reminder_time)
             med_and_rem_final.append(
                 {
                     "id": medicine.id,
                     "name": medicine.name,
                     "dosage": medicine.dosage,
-                    "reminder_time": medicine.reminders[0].reminder_time.strftime("%H:%M"),
+                    "reminder_time": output_time,
                 }
             )
+
+        if not med_and_rem_final:
+            raise ValueError("Список таблеток пуст! Сперва добавьте хотя бы одну таблетку")
 
         return med_and_rem_final
 
@@ -77,6 +81,20 @@ async def delete_medicine(medicine_id: int) -> None:
         medicine = await get_medicine_by_id(medicine_id)
         await session.delete(medicine)
         await session.commit()
+
+async def get_reminder_with_time(medicine_id: int) -> dict:
+    async with async_session_maker() as session:
+        query = (select(Medicine)
+                 .options(joinedload(Medicine.reminders))
+                 .where(Medicine.id == medicine_id))
+        result = await session.execute(query)
+        medicine = result.unique().scalar_one_or_none()
+        output_time = get_time_without_sec(medicine.reminders[0].reminder_time)
+        return {
+            "name": medicine.name,
+            "dosage": medicine.dosage,
+            "time": output_time,
+        }
 
 async def is_less_than_10_reminders(tg_id: int) -> bool:
     user = await get_user_or_raise(tg_id=tg_id)
