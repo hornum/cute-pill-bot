@@ -15,7 +15,12 @@ async def start(message: Message):
     user = await get_or_create_user(message.chat.id, message.from_user.id, message.from_user.username)
 
     await message.reply(
-        f"Привет, {user.username}!\n\nЧто этот бот может:\n\n{HELP_TEXT}",
+        f"Привет, {message.from_user.first_name}!\n\n"
+        f"Этот бот будет присылать тебе напоминания о приёме таблеток.\n\n"
+        f"Чтобы начать, добавь хотя бы одну таблетку командой /add или через кнопки меню.\n\n"
+        f"❗️❗️ ВАЖНО: "
+        f"Сейчас в боте отсутствует выбор часового пояса, поэтому все напоминания работают по МОСКОВСКОМУ ВРЕМЕНИ\n\n"
+        f"Основные команды:\n\n{HELP_TEXT}",
         reply_markup=kb.main_menu
     )
 
