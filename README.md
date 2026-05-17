@@ -32,22 +32,24 @@ cute-pill-bot/
 │   ├── bot/
 │   │   ├── handlers/
 │   │   │   ├── __init__.py
-│   │   │   ├── medicines.py   # управление таблетками
-│   │   │   ├── reminders.py   # коллбеки напоминаний
-│   │   │   └── start.py       # /start, /help
-│   │   ├── instance.py        # экземпляры bot и scheduler
-│   │   ├── keyboards.py       # клавиатуры
-│   │   └── states.py          # FSM состояния
-│   ├── db/
-│   │   ├── base.py            # базовый класс модели
-│   │   ├── models.py          # модели
-│   │   └── session.py         # фабрика сессий
-│   ├── scheduler/
-│   │   └── jobs.py            # задачи планировщика
-│   ├── service/
-│   │   ├── pill_service.py    # логика работы с таблетками
-│   │   ├── reminder_service.py
-│   │   └── user_service.py    # логика работы с пользователями
+│   │   │   ├── medicines.py        # добавление и вывод списка таблеток
+│   │   │   ├── medicines_edit.py   # коллбеки изменения таблетки
+│   │   │   ├── medicines_delete.py # коллбеки удаления таблетки
+│   │   │   ├── reminders.py        # коллбеки напоминаний
+│   │   │   └── start.py            # /start, /help
+│   │   ├── instance.py             # экземпляры bot и scheduler
+│   │   ├── keyboards.py            # клавиатуры
+│   │   └── states.py               # FSM состояния
+│   ├── db/     
+│   │   ├── base.py                 # базовый класс модели
+│   │   ├── models.py               # модели
+│   │   └── session.py              # фабрика сессий
+│   ├── scheduler/      
+│   │   └── jobs.py                 # задачи планировщика
+│   ├── service/        
+│   │   ├── pill_service.py         # логика работы с таблетками
+│   │   ├── reminder_service.py     # логика работы с напоминаниями
+│   │   └── user_service.py         # логика работы с пользователями
 │   ├── config.py
 │   └── main.py
 ├── migrations/
