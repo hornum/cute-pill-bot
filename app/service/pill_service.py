@@ -47,6 +47,7 @@ async def get_medicines_and_reminders_list(tg_id: int) -> list:
             select(Medicine)
             .options(joinedload(Medicine.reminders))
             .where(Medicine.user_id == user.id)
+            .order_by(Medicine.id)
         )
         result = await session.execute(query)
 
@@ -95,6 +96,28 @@ async def get_reminder_with_time(medicine_id: int) -> dict:
             "dosage": medicine.dosage,
             "time": output_time,
         }
+
+async def edit_med_and_reminder(medicine_id: int, change_param: str, value: str) -> dict:
+    async with async_session_maker() as session:
+        query = (select(Medicine)
+                 .options(joinedload(Medicine.reminders))
+                 .where(Medicine.id == medicine_id))
+        result = await session.execute(query)
+        medicine = result.unique().scalar_one_or_none()
+
+        if change_param == "name":
+            medicine.name = value
+        elif change_param == "dosage":
+            medicine.dosage = value
+        elif change_param == "time":
+            reminder = medicine.reminders[0]
+            reminder.reminder_time = parse_reminder_time(value)
+
+        await session.commit()
+        await session.refresh(medicine)
+
+        return {"name": medicine.name, "dosage": medicine.dosage, "time": medicine.reminders[0].reminder_time}
+
 
 async def is_less_than_10_reminders(tg_id: int) -> bool:
     user = await get_user_or_raise(tg_id=tg_id)

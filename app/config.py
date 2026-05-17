@@ -6,10 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 BASE_DIR = Path(__file__).resolve().parents[1]
 ENV_FILE = BASE_DIR / ".env"
 CHECK_REMINDERS_INTERVAL_SECS = 60
-HELP_COMMAND_TEXT = ("/help - Показать команды\n"
+HELP_COMMAND_TEXT = ("/start - Главное меню\n"
+                     "/help - Показать команды\n"
                      "/add - Добавить таблетку\n"
-                     "/list - Список всех таблеток\n"
-                     "/delete - Удалить таблетку по ID")
+                     "/list - Список всех таблеток\n")
 
 
 class Settings(BaseSettings):

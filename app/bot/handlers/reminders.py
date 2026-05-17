@@ -9,18 +9,21 @@ router = Router()
 
 @router.callback_query(F.data.startswith("taken:"))
 async def on_taken(callback: CallbackQuery):
-    await callback.message.edit_text("✅ Приём отмечен!")
+    pill_name = callback.message.text.replace("Напоминание\nПора принять ", "")
+    await callback.message.edit_text(f"{pill_name}\n\n✅ Приём отмечен!")
     await callback.answer()
 
 @router.callback_query(F.data.startswith("skipped:"))
 async def on_skipped(callback: CallbackQuery):
-    await callback.message.edit_text("❌ Приём пропущен.")
+    pill_name = callback.message.text.replace("Напоминание\nПора принять ", "")
+    await callback.message.edit_text(f"{pill_name}\n\n❌ Приём пропущен.")
     await callback.answer()
 
 @router.callback_query(F.data.startswith("snooze:"))
 async def on_snooze(callback: CallbackQuery):
     reminder_id = int(callback.data.split(":")[1])
     snooze_time = datetime.now(timezone.utc) + timedelta(minutes=15)
+    snooze_time = snooze_time.replace(second=0, microsecond=0)
 
     scheduler.add_job(
         resend_reminder,
