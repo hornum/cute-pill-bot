@@ -21,7 +21,7 @@ async def start(message: Message):
         f"❗️❗️ ВАЖНО: "
         f"Сейчас в боте отсутствует выбор часового пояса, поэтому все напоминания работают по МОСКОВСКОМУ ВРЕМЕНИ\n\n"
         f"Основные команды:\n\n{HELP_TEXT}",
-        reply_markup=kb.main_menu
+        reply_markup=kb.main_menu_kb
     )
 
 @router.message(Command('help'))

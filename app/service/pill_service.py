@@ -39,6 +39,39 @@ async def create_medicine_and_reminder(
 
         return medicine, reminder
 
+async def create_medicine_and_reminders(
+        tg_id: int,
+        pill_name: str,
+        dose: str,
+        times: list[str]
+) -> tuple[Medicine, list[Reminder]]:
+
+    async with async_session_maker() as session:
+        user = await get_user_or_raise(tg_id=tg_id)
+
+        medicine = Medicine(
+            user_id = user.id,
+            name = pill_name,
+            dosage = dose
+        )
+        session.add(medicine)
+        await session.flush()
+
+        reminders = []
+        for str_time in times:
+            parsed_time = parse_reminder_time(str_time)
+            reminder = Reminder(
+                medicine_id=medicine.id,
+                reminder_time=parsed_time
+            )
+            session.add(reminder)
+            reminders.append(reminder)
+
+        await session.commit()
+        await session.refresh(medicine)
+
+        return medicine, reminders
+
 async def get_medicines_and_reminders_list(tg_id: int) -> list:
     user = await get_user_or_raise(tg_id=tg_id)
 
@@ -55,13 +88,13 @@ async def get_medicines_and_reminders_list(tg_id: int) -> list:
         med_and_rem_final = []
 
         for medicine in medicines_with_reminders:
-            output_time = get_time_without_sec(medicine.reminders[0].reminder_time)
+            output_times = [get_time_without_sec(r.reminder_time) for r in medicine.reminders]
             med_and_rem_final.append(
                 {
                     "id": medicine.id,
                     "name": medicine.name,
                     "dosage": medicine.dosage,
-                    "reminder_time": output_time,
+                    "reminder_time": output_times,
                 }
             )
 
@@ -90,11 +123,13 @@ async def get_reminder_with_time(medicine_id: int) -> dict:
                  .where(Medicine.id == medicine_id))
         result = await session.execute(query)
         medicine = result.unique().scalar_one_or_none()
-        output_time = get_time_without_sec(medicine.reminders[0].reminder_time)
+        output_times = []
+        for rem in medicine.reminders:
+            output_times.append(get_time_without_sec(rem.reminder_time))
         return {
             "name": medicine.name,
             "dosage": medicine.dosage,
-            "time": output_time,
+            "times": output_times,
         }
 
 async def edit_med_and_reminder(medicine_id: int, change_param: str, value: str) -> dict:

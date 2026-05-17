@@ -1,13 +1,14 @@
 from aiogram.types import (InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton, )
 
 
-delete_confirmation = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text="✅"), KeyboardButton(text="❌")]
-], resize_keyboard=True, one_time_keyboard=True)
-
-main_menu = ReplyKeyboardMarkup(keyboard=[
+main_menu_kb = ReplyKeyboardMarkup(keyboard=[
     [KeyboardButton(text="➕ Добавить таблетку"), KeyboardButton(text="Список таблеток")],
 ], resize_keyboard=True)
+
+add_more_time_kb = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text="➕ Добавить ещё время", callback_data="add_more_time")],
+    [InlineKeyboardButton(text="✅ Готово", callback_data="finish_times")],
+])
 
 def pill_confirmation(reminder_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[

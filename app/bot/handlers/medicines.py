@@ -4,10 +4,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
 from app.bot.states import AddMedicine, EditMedicine
-from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminder, get_medicine_by_id, \
+from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminders, get_medicine_by_id, \
     delete_medicine, is_less_than_10_reminders, get_reminder_with_time, edit_med_and_reminder
 import app.bot.keyboards as kb
-from app.service.reminder_service import get_time_without_sec, parse_reminder_time
+from app.service.reminder_service import get_time_without_sec, parse_reminder_time, delete_all_reminders, \
+    add_reminders_to_medicine
 
 router = Router()
 
@@ -39,10 +40,11 @@ async def on_back_to_list(callback: CallbackQuery):
 async def on_med_selection(callback: CallbackQuery):
     med_id = int(callback.data.split(":")[1])
     med_with_time = await get_reminder_with_time(med_id)
+    times_str = ", ".join(r for r in med_with_time["times"])
     await callback.message.edit_text(text=f"Что хотите сделать?\n\n"
                                           f"Название: {med_with_time["name"]}\n"
                                           f"Дозировка: {med_with_time['dosage']}\n"
-                                          f"Время приёма: {med_with_time['time']}",
+                                          f"Время приёма: {times_str}",
                                      reply_markup=kb.medicines_actions_kb(med_id))
     await callback.answer()
 
@@ -77,29 +79,70 @@ async def process_medicine_dosage(message: Message, state: FSMContext):
 
 @router.message(AddMedicine.waiting_for_time)
 async def process_medicine_time(message: Message, state: FSMContext):
-    time_text = message.text.strip()
-    data = await state.get_data()
+    time_text = message.text.strip().replace('.', ':')
 
     try:
-        medicine, reminder = await create_medicine_and_reminder(
-            tg_id = message.from_user.id,
-            pill_name = data['name'],
-            dose = data['dosage'],
-            str_time = time_text
-        )
+        parse_reminder_time(time_text)
     except ValueError as error:
         await message.answer(str(error))
         return
 
-    await message.answer(
-        f"Готово! Добавлена:\n\n"
-        f"Таблетка: {medicine.name}\n"
-        f"Дозировка: {medicine.dosage}\n"
-        f"Время напоминания: Ежедневно, {get_time_without_sec(reminder.reminder_time)}",
-        reply_markup=kb.main_menu
-    )
-    await state.clear()
+    data = await state.get_data()
+    times = data.get("times", [])
+    times.append(time_text)
+    await state.update_data(times=times)
 
+    await message.answer(
+        f"Время {time_text} добавлено! Всего напоминаний: {len(times)}\n"
+        f"Хотите добавить ещё одно?",
+        reply_markup=kb.add_more_time_kb
+    )
+
+    await state.set_state(AddMedicine.waiting_for_more_time)
+
+
+@router.callback_query(F.data == "add_more_time")
+async def on_add_more_time(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text("Введите следующее время в формате ЧЧ:ММ")
+    await state.set_state(AddMedicine.waiting_for_time)
+    await callback.answer()
+
+@router.callback_query(F.data == "finish_times")
+async def on_finish_times(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    times = data["times"]
+    editing = data.get("editing", False)
+
+    if editing:
+        med_id = data["med_id"]
+        reminders = await add_reminders_to_medicine(med_id, times)
+        times_str = ", ".join(r.reminder_time.strftime("%H:%M") for r in reminders)
+        await callback.message.edit_text(f"✅ Время обновлено: {times_str}")
+        await callback.message.answer("Выберите действие:", reply_markup=kb.main_menu_kb)
+
+    else:
+        try:
+            medicine, reminders = await create_medicine_and_reminders(
+                tg_id=callback.from_user.id,
+                pill_name=data["name"],
+                dose=data["dosage"],
+                times=times
+            )
+        except ValueError as error:
+            await callback.message.edit_text(str(error))
+            return
+
+        times_str = ", ".join(r.reminder_time.strftime("%H:%M") for r in reminders)
+        await callback.message.edit_text(
+            f"✅ Готово! Добавлена:\n\n"
+            f"Таблетка: {medicine.name}\n"
+            f"Дозировка: {medicine.dosage}\n"
+            f"Время напоминаний: {times_str}"
+        )
+        await callback.message.answer("Выберите действие:", reply_markup=kb.main_menu_kb)
+
+    await callback.answer()
+    await state.clear()
 
 @router.callback_query(F.data.startswith("delete:"))
 async def on_delete_medicine(callback: CallbackQuery):
@@ -118,6 +161,16 @@ async def on_conf_delete_medicine(callback: CallbackQuery):
 async def on_edit_med(callback: CallbackQuery, state: FSMContext):
     med_id = int(callback.data.split(":")[1])
     await callback.message.edit_text("Что вы хотите изменить?", reply_markup=kb.change_menu_kb(med_id))
+    await callback.answer()
+
+@router.callback_query(F.data.startswith("change:time:"))
+async def on_edit_times(callback: CallbackQuery, state: FSMContext):
+    med_id = int(callback.data.split(":")[2])
+    await delete_all_reminders(med_id)
+    await state.clear()
+    await state.update_data(med_id=med_id, times=[], editing=True)
+    await state.set_state(AddMedicine.waiting_for_time)
+    await callback.message.edit_text("Введите новое время приёма в формате ЧЧ:ММ:")
     await callback.answer()
 
 @router.callback_query(F.data.startswith("change:"))
@@ -148,6 +201,6 @@ async def edit_medicine(message: Message, state: FSMContext):
     await message.answer(text="Напоминание изменено!\n\n"
                                  f"{new_values_list['name']}\n"
                               f"{new_values_list['dosage']}"
-                              f"\n{get_time_without_sec(new_values_list['time'])}")
+                              f"\n{get_time_without_sec(new_values_list['time'])}", reply_markup=kb.main_menu_kb)
     await state.clear()
 
