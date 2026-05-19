@@ -47,7 +47,7 @@ cute-pill-bot/
 │   ├── scheduler/      
 │   │   └── jobs.py                 # задачи планировщика
 │   ├── service/        
-│   │   ├── pill_service.py         # логика работы с таблетками
+│   │   ├── medicine_service.py     # логика работы с таблетками
 │   │   ├── reminder_service.py     # логика работы с напоминаниями
 │   │   └── user_service.py         # логика работы с пользователями
 │   ├── config.py

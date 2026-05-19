@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 
 from app.bot.states import AddMedicine, EditMedicine
-from app.service.pill_service import edit_med_and_reminder
+from app.service.medicine_service import edit_med_and_reminder, toggle_med_status, get_reminder_with_time
 import app.bot.keyboards as kb
 from app.service.reminder_service import get_time_without_sec, delete_all_reminders
 
@@ -57,3 +57,21 @@ async def edit_medicine(message: Message, state: FSMContext):
                               f"{new_values_list['dosage']}"
                               f"\n{get_time_without_sec(new_values_list['time'])}", reply_markup=kb.main_menu_kb)
     await state.clear()
+
+
+@router.callback_query(F.data.startswith("change_active_status:"))
+async def on_change_active_status(callback: CallbackQuery):
+    med_id = int(callback.data.split(":")[1])
+    await toggle_med_status(med_id)
+    med_with_time = await get_reminder_with_time(med_id)
+    times_str = ", ".join(r for r in med_with_time["times"])
+    med_status_str = "Включены ✅" if med_with_time["is_active"] else "Отключены ❌"
+    await callback.message.edit_text(
+        text=f"Что хотите сделать?\n\n"
+             f"Название: {med_with_time['name']}\n"
+             f"Дозировка: {med_with_time['dosage']}\n"
+             f"Время приёма: {times_str}\n"
+             f"Статус напоминаний: {med_status_str}",
+        reply_markup=kb.medicines_actions_kb(med_id, med_with_time["is_active"])
+    )
+    await callback.answer()

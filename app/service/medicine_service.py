@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 
 from app.db.models import Medicine, Reminder
@@ -130,6 +130,7 @@ async def get_reminder_with_time(medicine_id: int) -> dict:
             "name": medicine.name,
             "dosage": medicine.dosage,
             "times": output_times,
+            "is_active": medicine.is_active,
         }
 
 async def edit_med_and_reminder(medicine_id: int, change_param: str, value: str) -> dict:
@@ -166,3 +167,21 @@ async def is_less_than_10_reminders(tg_id: int) -> bool:
         return True
 
     return False
+
+
+async def toggle_med_status(med_id: int) -> None:
+    async with async_session_maker() as session:
+        medicine = await session.get(Medicine, med_id)
+        medicine.is_active = not medicine.is_active
+        await session.commit()
+
+
+async def disable_user_meds(user_id: int) -> None:
+    async with async_session_maker() as session:
+        await session.execute(
+            update(Medicine)
+            .where(Medicine.user_id == user_id)
+            .values(is_active=False)
+        )
+
+        await session.commit()

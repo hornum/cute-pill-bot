@@ -1,12 +1,14 @@
 from datetime import datetime, timezone, time
 
 from aiogram import Bot
+from aiogram.exceptions import TelegramForbiddenError
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from app.bot.keyboards import pill_confirmation
 from app.db.models import Reminder, Medicine
 from app.db.session import async_session_maker
+from app.service.medicine_service import disable_user_meds
 
 
 def get_time_without_secs() -> time:
@@ -28,15 +30,18 @@ async def send_reminder(bot: Bot, chat_id: int, reminder: Reminder) -> None:
     if reminder is None:
         return
 
-    await bot.send_message(
-        chat_id=chat_id,
-        text=(
-            "Напоминание\n"
-            f"Пора принять {reminder.medicine.name}\n"
-            f"В количестве: {reminder.medicine.dosage}\n"
-        ),
-        reply_markup=pill_confirmation(reminder.id)
-    )
+    try:
+        await bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "Напоминание\n"
+                f"Пора принять {reminder.medicine.name}\n"
+                f"В количестве: {reminder.medicine.dosage}\n"
+            ),
+            reply_markup=pill_confirmation(reminder.id)
+        )
+    except TelegramForbiddenError:
+        await disable_user_meds(reminder.medicine.user_id)
 
 
 async def resend_reminder(bot: Bot, chat_id: int, reminder_id: int):
@@ -58,10 +63,12 @@ async def check_reminders(bot: Bot) -> None:
     async with async_session_maker() as session:
         query = (
             select(Reminder)
-            .options(joinedload(Reminder.medicine).joinedload(Medicine.user)
-                     ).where(
+            .join(Reminder.medicine)
+            .options(joinedload(Reminder.medicine).joinedload(Medicine.user))
+            .where(
                 Reminder.reminder_time == current_time,
                 Reminder.is_active == True,
+                Medicine.is_active == True,
             )
         )
 

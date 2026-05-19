@@ -31,18 +31,28 @@ def medicines_list_kb(medicines: list) -> InlineKeyboardMarkup:
 
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-def medicines_actions_kb(med_id: int) -> InlineKeyboardMarkup:
+def medicines_actions_kb(med_id: int, is_active: bool) -> InlineKeyboardMarkup:
+    if is_active:
+        change_status_str = "Отключить напоминания ❌"
+    else:
+        change_status_str = "Включить напоминания ✅"
+
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="Изменить напоминание", callback_data=f"edit_med:{med_id}")
-         ,InlineKeyboardButton(text="Удалить таблетку", callback_data=f"delete:{med_id}")],
-        [InlineKeyboardButton(text="Назад к списку", callback_data=f"back_to_list")],
+        [InlineKeyboardButton(text="Изменить напоминание", callback_data=f"edit_med:{med_id}")],
+
+        [InlineKeyboardButton(text=change_status_str, callback_data=f"change_active_status:{med_id}")],
+
+        [InlineKeyboardButton(text="Удалить таблетку", callback_data=f"delete:{med_id}"),
+        InlineKeyboardButton(text="Назад к списку", callback_data=f"back_to_list")],
     ])
+
 
 def delete_confirmation_kb(med_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="✅", callback_data=f"conf_delete:{med_id}"),
          InlineKeyboardButton(text="❌", callback_data=f"back_to_list")],
     ])
+
 
 def change_menu_kb(med_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[

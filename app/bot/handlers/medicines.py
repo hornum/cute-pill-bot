@@ -4,7 +4,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, ReplyKeyboardRemove, CallbackQuery
 
 from app.bot.states import AddMedicine
-from app.service.pill_service import get_medicines_and_reminders_list, create_medicine_and_reminders, \
+from app.service.medicine_service import get_medicines_and_reminders_list, create_medicine_and_reminders, \
     is_less_than_10_reminders, get_reminder_with_time
 import app.bot.keyboards as kb
 from app.service.reminder_service import parse_reminder_time, add_reminders_to_medicine
@@ -41,11 +41,13 @@ async def on_med_selection(callback: CallbackQuery):
     med_id = int(callback.data.split(":")[1])
     med_with_time = await get_reminder_with_time(med_id)
     times_str = ", ".join(r for r in med_with_time["times"])
+    med_status_str = "Включены ✅" if med_with_time["is_active"] else "Отключены ❌"
     await callback.message.edit_text(text=f"Что хотите сделать?\n\n"
                                           f"Название: {med_with_time["name"]}\n"
                                           f"Дозировка: {med_with_time['dosage']}\n"
-                                          f"Время приёма: {times_str}",
-                                     reply_markup=kb.medicines_actions_kb(med_id))
+                                          f"Время приёма: {times_str}\n"
+                                          f"Статус напоминаний: {med_status_str}",
+                                     reply_markup=kb.medicines_actions_kb(med_id, med_with_time["is_active"]))
     await callback.answer()
 
 

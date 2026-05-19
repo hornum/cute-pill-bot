@@ -1,7 +1,7 @@
 from aiogram import Router, F
 from aiogram.types import CallbackQuery
 
-from app.service.pill_service import get_medicine_by_id, delete_medicine
+from app.service.medicine_service import get_medicine_by_id, delete_medicine
 import app.bot.keyboards as kb
 
 
